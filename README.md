@@ -24,6 +24,7 @@
   - [🪡 Stitches, Duets and Comments](#stitches-duets-and-comments)
   - [🌐 Proxy](#proxy)
   - [📆 Schedule](#schedule)
+  - [🎵 Sound / Music](#sound)
   - [🛍️ Product Link](#product-link)
   - [🔐 Authentication](#authentication)
   - [👀 Browser Selection](#browser-selection)
@@ -196,6 +197,46 @@ my_cover = "crazy_cover.jpg"
 
 uploader = TikTokUploader(cookies='cookies.txt')
 uploader.upload_video(..., cover=my_cover)
+```
+
+<h2 id="sound"> 🎵 Sound / Music</h2>
+
+You can add background music from TikTok's sound library when uploading a video.
+
+Provide `sound_name` to search and select a matching track. Optionally provide `sound_artist` to filter results more precisely.
+
+**Matching logic:**
+- Traverses all search results and picks the first one whose title matches `sound_name` (case-insensitive)
+- If `sound_artist` is provided, also checks that the artist name contains the given string
+- If no match is found, falls back to the first result with a warning
+
+> **Important:** Use the exact song title and artist name as they appear in TikTok's Sounds panel to ensure a correct match.
+
+```python
+from tiktok_uploader.upload import TikTokUploader
+
+uploader = TikTokUploader(cookies='cookies.txt')
+
+# Match by song title only
+uploader.upload_video('video.mp4', description='...', sound_name='Min plan')
+
+# Match by both title and artist (recommended for accuracy)
+uploader.upload_video('video.mp4', description='...', sound_name='Min plan', sound_artist='Jacub')
+```
+
+When using `upload_videos`, add `sound_name` and `sound_artist` to each video dictionary:
+
+```python
+videos = [
+    {
+        'path': 'video.mp4',
+        'description': 'My video',
+        'sound_name': 'Min plan',
+        'sound_artist': 'Jacub'
+    }
+]
+
+uploader.upload_videos(videos=videos)
 ```
 
 <h2 id="product-link"> 🛍️ Product Link</h2>
