@@ -367,7 +367,9 @@ def complete_upload_form(
         _set_cover(page, cover_path)
     if not skip_split_window:
         _remove_split_window(page)
+    _dismiss_modal(page)
     _set_interactivity(page, **kwargs)
+    _dismiss_modal(page)
     _set_description(page, description)
     if visibility != "everyone":
         _set_visibility(page, visibility)
@@ -549,6 +551,36 @@ def _remove_split_window(page: Page) -> None:
             window.click()
     except PlaywrightTimeoutError:
         logger.debug(red("Split window not found or operation timed out"))
+
+
+def _dismiss_modal(page: Page) -> None:
+    """
+    Dismisses any open modal overlay (react-joyride tutorial or TUXModal) that may block interactions
+    """
+    # Dismiss react-joyride tutorial overlay
+    try:
+        overlay = page.locator("#react-joyride-portal .react-joyride__overlay")
+        if overlay.is_visible(timeout=2000):
+            overlay.click()
+            time.sleep(0.5)
+    except Exception:
+        pass
+
+    # Dismiss TUXModal / floating-ui-portal overlay via Escape (unconditional)
+    try:
+        page.keyboard.press("Escape")
+        time.sleep(0.5)
+    except Exception:
+        pass
+
+    # Force-remove TUXModal / floating-ui-portal overlays via JS
+    try:
+        page.evaluate("""
+            document.querySelectorAll('[data-floating-ui-portal]').forEach(el => el.remove());
+        """)
+        time.sleep(0.3)
+    except Exception:
+        pass
 
 
 def _set_interactivity(
