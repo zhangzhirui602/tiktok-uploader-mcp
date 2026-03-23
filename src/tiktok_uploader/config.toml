@@ -23,7 +23,7 @@ max_description_length = 150 # characters
 [paths]
 main = "https://www.tiktok.com/"
 login = "https://www.tiktok.com/login/phone-or-email/email"
-upload = "https://www.tiktok.com/creator-center/upload?lang=en"
+upload = "https://www.tiktok.com/tiktokstudio/upload"
 
 [disguising]
 user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
@@ -78,6 +78,12 @@ user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 	time_picker_container = "//div[@class='tiktok-timepicker-time-picker-container']"
 	timepicker_hours = "//span[contains(@class, 'tiktok-timepicker-left')]"
 	timepicker_minutes = "//span[contains(@class, 'tiktok-timepicker-right')]"
+
+	[selectors.upload.sound]
+	add_sound_button = "//button[@data-button-name='sounds']"
+	search_input = "//input[@placeholder='Search sounds']"
+	first_result_add_button = "(//div[contains(@class, 'MusicPanelMusicItem__operation')]//button)[1]"
+	save_button = "//div[contains(@class, 'clip-forge-editor-header-right')]//button[contains(@class, 'Button__root--type-primary')]"
 
 	[selectors.upload.cookies_banner]
 		banner = "tiktok-cookie-banner"

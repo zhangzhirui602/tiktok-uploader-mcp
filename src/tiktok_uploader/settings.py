@@ -60,6 +60,13 @@ class Cover(StrictModel):
     exit_cover_container: str
 
 
+class SoundSelectors(StrictModel):
+    add_sound_button: str
+    search_input: str
+    first_result_add_button: str
+    save_button: str
+
+
 class UploadSelectors(StrictModel):
     iframe: str
     split_window: str
@@ -69,6 +76,7 @@ class UploadSelectors(StrictModel):
     process_confirmation: str
     description: str
     cover: Cover
+    sound: SoundSelectors
 
     visibility: str
     options: list[VisibilityOption]
