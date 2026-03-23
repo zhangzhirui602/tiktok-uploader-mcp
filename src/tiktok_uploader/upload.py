@@ -92,6 +92,7 @@ class TikTokUploader:
         cover: str | None = None,
         visibility: Literal["everyone", "friends", "only_you"] = "everyone",
         sound_name: str | None = None,
+        sound_artist: str | None = None,
         num_retries: int = 1,
         skip_split_window: bool = False,
         *args,
@@ -115,6 +116,8 @@ class TikTokUploader:
             video_dict["cover"] = cover
         if sound_name:
             video_dict["sound_name"] = sound_name
+        if sound_artist:
+            video_dict["sound_artist"] = sound_artist
 
         failed_list = self.upload_videos(
             [video_dict], num_retries, skip_split_window, *args, **kwargs
@@ -156,6 +159,7 @@ class TikTokUploader:
 
                 visibility = video.get("visibility", "everyone")
                 sound_name = video.get("sound_name", None)
+                sound_artist = video.get("sound_artist", None)
 
                 logger.debug(
                     "Posting %s%s",
@@ -212,6 +216,7 @@ class TikTokUploader:
                     num_retries,
                     self.headless,
                     sound_name=sound_name,
+                    sound_artist=sound_artist,
                     *args,
                     **kwargs,
                 )  # type: ignore[misc]
@@ -261,6 +266,7 @@ def upload_video(
     cover: str | None = None,
     visibility: Literal["everyone", "friends", "only_you"] = "everyone",
     sound_name: str | None = None,
+    sound_artist: str | None = None,
     browser: Literal["chrome", "safari", "chromium", "edge", "firefox"] = "chrome",
     headless: bool = False,
     *args,
@@ -298,6 +304,8 @@ def upload_video(
         video_dict["cover"] = cover
     if sound_name:
         video_dict["sound_name"] = sound_name
+    if sound_artist:
+        video_dict["sound_artist"] = sound_artist
 
     try:
         return uploader.upload_videos([video_dict], *args, **kwargs)
@@ -361,6 +369,7 @@ def complete_upload_form(
     num_retries: int = 1,
     headless: bool = False,
     sound_name: str | None = None,
+    sound_artist: str | None = None,
     *args,
     **kwargs,
 ) -> None:
@@ -381,7 +390,7 @@ def complete_upload_form(
     _dismiss_modal(page)
     _set_description(page, description)
     if sound_name:
-        _set_sound(page, sound_name)
+        _set_sound(page, sound_name, sound_artist)
     if visibility != "everyone":
         _set_visibility(page, visibility)
     if schedule:
@@ -495,12 +504,16 @@ def _set_description(page: Page, description: str) -> None:
         desc_locator.fill(saved_description)
 
 
-def _set_sound(page: Page, sound_name: str) -> None:
+def _set_sound(page: Page, sound_name: str, sound_artist: str | None = None) -> None:
     """
     Searches for and selects a sound/music track from TikTok's sound library.
-    Clicks the Sounds button in the editor panel, searches by name, and selects
-    the first result. If the sound is not found or the operation fails, logs a
-    warning and continues without sound.
+
+    Traverses all search results and picks the best match:
+    - If sound_artist is provided: matches both title and artist (case-insensitive)
+    - Otherwise: exact title match (case-insensitive)
+    - Falls back to the first result if no match is found, with a warning.
+
+    If the entire operation fails, logs a warning and continues without sound.
     """
     logger.debug(green(f"Setting sound: {sound_name}"))
 
@@ -513,22 +526,59 @@ def _set_sound(page: Page, sound_name: str) -> None:
         add_sound_btn.click()
         time.sleep(1.5)
 
-        # Type the sound name into the search box and press Enter to
-        # dismiss the autocomplete suggestion dropdown before clicking results
+        # Type the sound name and press Enter to dismiss autocomplete suggestions
         search_input = page.locator(
             f"xpath={config.selectors.upload.sound.search_input}"
         )
         search_input.wait_for(state="visible", timeout=config.implicit_wait * 1000)
         search_input.fill(sound_name)
         search_input.press("Enter")
-        time.sleep(2)  # wait for search results to load
+        time.sleep(2)
 
-        # Click the "+" (add) button on the first search result
-        first_add_btn = page.locator(
-            f"xpath={config.selectors.upload.sound.first_result_add_button}"
+        # Traverse results and find the best match
+        items = page.locator(f"xpath={config.selectors.upload.sound.result_items}")
+        items.first.wait_for(state="visible", timeout=config.implicit_wait * 1000)
+
+        target_title = sound_name.strip().lower()
+        target_artist = sound_artist.strip().lower() if sound_artist else None
+
+        matched_item = None
+        for item in items.all():
+            try:
+                title_el = item.locator(
+                    f"xpath={config.selectors.upload.sound.result_title}"
+                )
+                title = title_el.inner_text().strip().lower()
+
+                if title != target_title:
+                    continue
+
+                if target_artist:
+                    artist_el = item.locator(
+                        f"xpath={config.selectors.upload.sound.result_artist}"
+                    )
+                    artist = artist_el.inner_text().strip().lower()
+                    if target_artist not in artist:
+                        continue
+
+                matched_item = item
+                break
+            except Exception:
+                continue
+
+        if matched_item is None:
+            logger.warning(
+                f"No exact match found for '{sound_name}'"
+                + (f" by '{sound_artist}'" if sound_artist else "")
+                + ". Falling back to first result."
+            )
+            matched_item = items.first
+
+        # Click the "+" button on the matched item
+        add_btn = matched_item.locator(
+            f"xpath={config.selectors.upload.sound.result_add_button}"
         )
-        first_add_btn.wait_for(state="visible", timeout=config.implicit_wait * 1000)
-        first_add_btn.click()
+        add_btn.click()
         time.sleep(1)
 
         # Click Save to close the editor and return to the upload form
@@ -543,7 +593,6 @@ def _set_sound(page: Page, sound_name: str) -> None:
         logger.warning(
             f"Failed to set sound '{sound_name}': {e}. Continuing without sound."
         )
-        # Try to close the sound picker if it's open
         try:
             page.keyboard.press("Escape")
             time.sleep(0.5)

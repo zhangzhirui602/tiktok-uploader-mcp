@@ -82,7 +82,10 @@ user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 	[selectors.upload.sound]
 	add_sound_button = "//button[@data-button-name='sounds']"
 	search_input = "//input[@placeholder='Search sounds']"
-	first_result_add_button = "(//div[contains(@class, 'MusicPanelMusicItem__operation')]//button)[1]"
+	result_items = "//div[@role='listitem' and @data-item-id]"
+	result_title = ".//div[contains(@class, 'MusicPanelMusicItem__infoBasicTitle')]"
+	result_artist = ".//div[contains(@class, 'MusicPanelMusicItem__infoBasicDesc')]"
+	result_add_button = ".//div[contains(@class, 'MusicPanelMusicItem__operation')]//button"
 	save_button = "//div[contains(@class, 'clip-forge-editor-header-right')]//button[contains(@class, 'Button__root--type-primary')]"
 
 	[selectors.upload.cookies_banner]

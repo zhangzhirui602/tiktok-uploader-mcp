@@ -63,7 +63,10 @@ class Cover(StrictModel):
 class SoundSelectors(StrictModel):
     add_sound_button: str
     search_input: str
-    first_result_add_button: str
+    result_items: str
+    result_title: str
+    result_artist: str
+    result_add_button: str
     save_button: str
 
 
