@@ -88,6 +88,9 @@ usage: tiktok-uploader [-h] -v VIDEO [-d DESCRIPTION] [-t SCHEDULE] [--proxy PRO
 
 ```bash
 tiktok-uploader -v video.mp4 -d "这是我的视频描述" -c cookies.txt
+
+# 添加背景音乐
+tiktok-uploader -v video.mp4 -d "这是我的视频描述" -c cookies.txt --sound-name "Min plan" --sound-artist "Jacub"
 ```
 
 ```python

@@ -23,6 +23,8 @@ def main() -> None:
     proxy = parse_proxy(args.proxy)
     product_id = args.product_id
     visibility = args.visibility
+    sound_name = args.sound_name
+    sound_artist = args.sound_artist
 
     # runs the program using the arguments provided
     with TikTokUploader(
@@ -40,6 +42,8 @@ def main() -> None:
             product_id=product_id,
             cover=args.cover,
             visibility=visibility,
+            sound_name=sound_name,
+            sound_artist=sound_artist,
         )
 
     print("-------------------------")
@@ -85,6 +89,16 @@ def get_uploader_args() -> Namespace:
         default="everyone",
     )
     parser.add_argument("--cover", help="Custom cover image file", default=None)
+    parser.add_argument(
+        "--sound-name",
+        help="Name of the TikTok sound/music to add as background music",
+        default=None,
+    )
+    parser.add_argument(
+        "--sound-artist",
+        help="Artist name to refine sound search (optional, used with --sound-name)",
+        default=None,
+    )
 
     # authentication arguments
     parser.add_argument("-c", "--cookies", help="The cookies you want to use")

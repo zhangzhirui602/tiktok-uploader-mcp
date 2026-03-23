@@ -88,6 +88,9 @@ Using the CLI is as simple as calling `tiktok-uploader` with your videos: `path`
 
 ```bash
 tiktok-uploader -v video.mp4 -d "this is my escaped \"description\"" -c cookies.txt
+
+# With background music
+tiktok-uploader -v video.mp4 -d "my description" -c cookies.txt --sound-name "Min plan" --sound-artist "Jacub"
 ```
 
 ```python
