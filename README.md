@@ -212,6 +212,8 @@ Provide `sound_name` to search and select a matching track. Optionally provide `
 
 > **Important:** Use the exact song title and artist name as they appear in TikTok's Sounds panel to ensure a correct match.
 
+> **Limitation:** TikTok only loads approximately 10–20 results per search. If your target song ranks outside this initial batch, it will not appear in the list and the uploader will fall back to the first result. For best results, use well-known tracks or include the artist name to help TikTok surface the correct song.
+
 ```python
 from tiktok_uploader.upload import TikTokUploader
 

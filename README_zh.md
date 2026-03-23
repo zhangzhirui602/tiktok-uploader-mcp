@@ -210,6 +210,8 @@ uploader.upload_video(..., cover=my_cover)
 
 > **重要：** 请使用 TikTok Sounds 面板中显示的**准确歌名和歌手名**，以确保匹配正确。
 
+> **局限性：** TikTok 每次搜索只加载约 10–20 条结果。如果目标歌曲排在这批结果之外，则不会出现在列表中，上传工具会自动 fallback 到第一条。建议使用知名度较高的歌曲，或同时提供歌手名以帮助 TikTok 更准确地返回目标歌曲。
+
 ```python
 from tiktok_uploader.upload import TikTokUploader
 
