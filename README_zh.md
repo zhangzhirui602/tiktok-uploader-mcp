@@ -177,16 +177,69 @@ uploader.upload_video(...)
 
 <h2 id="schedule"> 📆 定时发布</h2>
 
-定时发布使用 UTC 时区。发布时间必须至少在当前时间 **20 分钟后**，最多提前 **10 天**。
+定时发布使用 UTC 时区。发布时间必须至少在当前时间 **20 分钟后**，最多提前 **10 天**，且分钟数必须是 **5 的倍数**（如 10:00、10:05、10:10）。
+
+**单个视频定时发布（CLI）：**
+
+```bash
+# Windows PowerShell
+uv run tiktok-uploader -v video.mp4 -d "视频描述" -c cookies.txt -t "2026-03-25 10:00" --attach
+```
+
+**批量视频定时发布（CLI）：**
+
+```bash
+# Windows PowerShell（用反引号 ` 换行）
+uv run tiktok-uploader-batch `
+  -v video1.mp4 `
+  -v video2.mp4 `
+  -v video3.mp4 `
+  -d "第一个视频描述" `
+  -d "第二个视频描述" `
+  -d "第三个视频描述" `
+  --schedule-from "2026-03-25 10:00" `
+  --schedule-interval 1440 `
+  --timezone "Asia/Shanghai" `
+  -c cookies.txt `
+  --attach
+```
+
+| 参数 | 说明 | 默认值 |
+|---|---|---|
+| `-v` | 视频文件路径，每个视频重复一次 | 必填 |
+| `-d` | 视频描述，顺序对应 `-v` | 可选 |
+| `--schedule-from` | 第一个视频的发布时间（`YYYY-MM-DD HH:MM`）| 不填则立即发布 |
+| `--schedule-interval` | 每个视频之间的间隔分钟数 | `1440`（24小时）|
+| `--timezone` | `--schedule-from` 所用时区 | `Europe/Copenhagen` |
+| `-c` | cookies 文件路径 | 可选 |
+| `--attach` | 显示浏览器窗口（调试用） | 默认无头模式 |
+
+**Python API：**
 
 ```python
 import datetime
 from tiktok_uploader.upload import TikTokUploader
 
-schedule = datetime.datetime(2020, 12, 20, 13, 00)
+schedule = datetime.datetime(2026, 3, 25, 10, 0)  # UTC 时间
 
 uploader = TikTokUploader(cookies='cookies.txt')
-uploader.upload_video(..., schedule=schedule)
+uploader.upload_video('video.mp4', description='视频描述', schedule=schedule)
+```
+
+批量定时发布：
+
+```python
+import datetime
+from tiktok_uploader.upload import TikTokUploader
+
+videos = [
+    {'path': 'video1.mp4', 'description': '第一个视频', 'schedule': datetime.datetime(2026, 3, 25, 10, 0)},
+    {'path': 'video2.mp4', 'description': '第二个视频', 'schedule': datetime.datetime(2026, 3, 26, 10, 0)},
+    {'path': 'video3.mp4', 'description': '第三个视频', 'schedule': datetime.datetime(2026, 3, 27, 10, 0)},
+]
+
+uploader = TikTokUploader(cookies='cookies.txt')
+uploader.upload_videos(videos=videos)
 ```
 
 <h2 id="covers"> 🖼️ 封面图</h2>
