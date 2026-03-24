@@ -185,7 +185,7 @@ class TikTokUploader:
                     elif (utc_offset := schedule.utcoffset()) is not None and int(
                         utc_offset.total_seconds()
                     ) == 0:  # Equivalent to UTC
-                        schedule = timezone.localize(schedule)
+                        schedule = schedule.replace(tzinfo=pytz.UTC)
                     else:
                         print(
                             f"{schedule} is invalid, the schedule datetime must be naive or aware with UTC timezone, skipping"
@@ -406,13 +406,7 @@ def _go_to_upload(page: Page) -> None:
     """
     logger.debug(green("Navigating to upload page"))
 
-    if page.url != config.paths.upload:
-        page.goto(str(config.paths.upload))
-    else:
-        # refresh
-        page.reload()
-        # TODO: handle alert if any (Playwright auto-dismisses dialogs usually, or we can handle)
-        page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(str(config.paths.upload))
 
     # waits for the root to load
     page.wait_for_selector("#root", timeout=config.explicit_wait * 1000)
@@ -446,6 +440,8 @@ def _set_description(page: Page, description: str) -> None:
 
         words = description.split(" ")
         for word in words:
+            if not word:
+                continue
             if word[0] == "#":
                 desc_locator.press_sequentially(word, delay=50)
                 time.sleep(0.5)
@@ -766,6 +762,46 @@ def _set_visibility(
         logger.error(red(f"Failed to set visibility: {e}"))
 
 
+_SCHEDULE_SWITCH_SELECTORS = [
+    "xpath=//label[.//span[normalize-space()='Schedule']]",  # click label (React styled radio)
+    "xpath=//label[.//input[@name='postSchedule'][@value='schedule']]",
+    "xpath=//span[normalize-space()='Schedule']",
+    f"xpath={config.selectors.schedule.switch}",  # //input[@name='postSchedule'][@value='schedule']
+    "xpath=//button[@data-e2e='schedule-switch']",
+    "xpath=//div[contains(@class,'schedule')]//button[@role='switch']",
+    "xpath=//button[@role='switch']",
+]
+
+
+def _find_schedule_switch(page: Page):
+    """Try multiple selectors to find the schedule switch/toggle."""
+    short_timeout = 3000  # ms per candidate
+    for selector in _SCHEDULE_SWITCH_SELECTORS:
+        try:
+            loc = page.locator(selector).first
+            loc.wait_for(state="visible", timeout=short_timeout)
+            logger.debug(green(f"Schedule switch found with: {selector}"))
+            return loc
+        except Exception:
+            continue
+    raise PlaywrightTimeoutError(
+        f"Could not find schedule switch. Tried: {_SCHEDULE_SWITCH_SELECTORS}"
+    )
+
+
+def _dismiss_schedule_consent_dialog(page: Page) -> None:
+    """Click 'Allow' on the scheduled-posting consent dialog if it appears."""
+    allow_selector = "xpath=//button[.//div[normalize-space()='Allow']]"
+    try:
+        allow_btn = page.locator(allow_selector).first
+        allow_btn.wait_for(state="visible", timeout=3000)
+        allow_btn.click()
+        logger.debug(green("Dismissed schedule consent dialog"))
+        page.wait_for_timeout(500)
+    except Exception:
+        pass  # dialog not present, that's fine
+
+
 def _set_schedule_video(page: Page, schedule: datetime.datetime) -> None:
     """
     Sets the schedule of the video
@@ -783,20 +819,61 @@ def _set_schedule_video(page: Page, schedule: datetime.datetime) -> None:
     minute = schedule.minute
 
     try:
-        switch = page.locator(f"xpath={config.selectors.schedule.switch}")
+        switch = _find_schedule_switch(page)
         switch.click()
+        page.wait_for_timeout(1000)
+        _dismiss_schedule_consent_dialog(page)
+        page.wait_for_timeout(1000)  # wait for date/time picker to appear
         __date_picker(page, month, day)
         __time_picker(page, hour, minute)
     except Exception as e:
         msg = f"Failed to set schedule: {e}"
         logger.error(red(msg))
+        try:
+            page.screenshot(path="schedule_debug.png")
+            logger.error(red("Screenshot saved to schedule_debug.png"))
+            with open("schedule_debug.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+            logger.error(red("Page HTML saved to schedule_debug.html"))
+        except Exception:
+            pass
         raise FailedToUpload()
+
+
+_DATE_PICKER_SELECTORS = [
+    f"xpath={config.selectors.schedule.date_picker}",  # second TUXTextInputCore-input in schedule_container
+    "xpath=(//div[@data-e2e='schedule_container']//input[@class='TUXTextInputCore-input'])[2]",
+    "xpath=(//div[contains(@class,'scheduled-picker')]//input[@class='TUXTextInputCore-input'])[2]",
+    "xpath=(//div[contains(@class,'scheduled-picker')]//div[contains(@class,'TUXInputBox')])[2]",
+    "xpath=//div[@data-e2e='schedule_date_picker']",
+    "xpath=//div[contains(@class,'date-picker-input')]",
+]
 
 
 def __date_picker(page: Page, month: int, day: int) -> None:
     logger.debug(green("Picking date"))
 
-    date_picker = page.locator(f"xpath={config.selectors.schedule.date_picker}")
+    date_picker = None
+    for sel in _DATE_PICKER_SELECTORS:
+        try:
+            loc = page.locator(sel).first
+            loc.wait_for(state="visible", timeout=3000)
+            date_picker = loc
+            logger.debug(green(f"Date picker found with: {sel}"))
+            break
+        except Exception:
+            continue
+
+    if date_picker is None:
+        try:
+            page.screenshot(path="datepicker_debug.png")
+            with open("datepicker_debug.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+            logger.error(red("Date picker not found. Saved datepicker_debug.png and datepicker_debug.html"))
+        except Exception:
+            pass
+        raise Exception(f"Date picker not found. Tried: {_DATE_PICKER_SELECTORS}")
+
     date_picker.click()
 
     calendar = page.locator(f"xpath={config.selectors.schedule.calendar}")
@@ -834,7 +911,7 @@ def __date_picker(page: Page, month: int, day: int) -> None:
 def __verify_date_picked_is_correct(page: Page, month: int, day: int) -> None:
     date_selected = page.locator(
         f"xpath={config.selectors.schedule.date_picker}"
-    ).inner_text()
+    ).first.input_value()
     date_selected_month = int(date_selected.split("-")[1])
     date_selected_day = int(date_selected.split("-")[2])
 
@@ -883,7 +960,7 @@ def __time_picker(page: Page, hour: int, minute: int) -> None:
 def __verify_time_picked_is_correct(page: Page, hour: int, minute: int) -> None:
     time_selected = page.locator(
         f"xpath={config.selectors.schedule.time_picker_text}"
-    ).inner_text()
+    ).first.input_value()
     time_selected_hour = int(time_selected.split(":")[0])
     time_selected_minute = int(time_selected.split(":")[1])
 
@@ -1043,7 +1120,9 @@ def _set_cover(page: Page, cover_path: str) -> None:
             pass
 
 
-def _check_valid_path(path: str) -> bool:
+def _check_valid_path(path: object) -> bool:
+    if not isinstance(path, str):
+        return False
     return exists(path) and path.split(".")[-1] in config.supported_file_types
 
 

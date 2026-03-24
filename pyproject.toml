@@ -57,6 +57,7 @@ types = [
 
 [project.scripts]
 tiktok-uploader = "tiktok_uploader.cli:main"
+tiktok-uploader-batch = "tiktok_uploader.cli:batch_upload"
 tiktok-auth = "tiktok_uploader.cli:auth"
 
 [project.urls]
