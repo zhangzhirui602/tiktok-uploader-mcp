@@ -177,17 +177,76 @@ uploader.upload_video(...)
 
 <h2 id="schedule"> 📆 Schedule</h2>
 
-The datetime to schedule the video will be treated with the UTC timezone. <br>
-The scheduled datetime must be at least 20 minutes in the future and a maximum of 10 days.
+The scheduled datetime must be at least **20 minutes** in the future, a maximum of **10 days** ahead, and the minutes must be a **multiple of 5** (e.g. 10:00, 10:05, 10:10).
+
+**Single video (CLI):**
+
+```bash
+# Windows PowerShell
+uv run tiktok-uploader -v video.mp4 -d "my description" -c cookies.txt -t "2026-03-25 10:00" --attach
+```
+
+**Batch videos with scheduled posting (CLI):**
+
+```powershell
+uv run tiktok-uploader-batch `
+  -v video1.mp4 `
+  -v video2.mp4 `
+  -v video3.mp4 `
+  -d "description 1" `
+  -d "description 2" `
+  -d "description 3" `
+  --schedule-from "2026-03-25 10:00" `
+  --schedule-interval 1440 `
+  --timezone "Europe/Stockholm" `
+  -c cookies.txt `
+  --attach
+```
+
+| Parameter | Description | Default |
+|---|---|---|
+| `-v` | Video file path, repeat for each video | required |
+| `-d` | Description for each video, in order | optional |
+| `--sound-name` | Background music name per video (repeat to match `-v`, or pass once for all) | optional |
+| `--sound-artist` | Background music artist per video | optional |
+| `--schedule-from` | Publish time for the first video (`YYYY-MM-DD HH:MM`) | post immediately |
+| `--schedule-interval` | Minutes between each video's publish time | `1440` (24 h) |
+| `--timezone` | Timezone for `--schedule-from`, e.g. `Europe/Stockholm`, `Asia/Shanghai` | `Europe/Copenhagen` |
+| `-c` | Path to cookies file | optional |
+| `--attach` | Show browser window (useful for debugging) | headless by default |
+
+> **Timezone format:** `--timezone` must use the `Region/City` format (e.g. `Europe/Stockholm`). Passing only a city name (e.g. `Stockholm`) will cause an error.
+
+> **Batch interval only:** Batch upload supports evenly-spaced scheduling only. To set a different time for each video individually, use the Python API.
+
+> **Failure behaviour:** If the schedule setting fails, the upload is aborted — it will **not** fall back to posting immediately.
+
+**Python API:**
 
 ```python
 import datetime
 from tiktok_uploader.upload import TikTokUploader
 
-schedule = datetime.datetime(2020, 12, 20, 13, 00)
+schedule = datetime.datetime(2026, 3, 25, 10, 0)  # UTC time
 
 uploader = TikTokUploader(cookies='cookies.txt')
-uploader.upload_video(..., schedule=schedule)
+uploader.upload_video('video.mp4', description='my description', schedule=schedule)
+```
+
+Batch with individual schedules:
+
+```python
+import datetime
+from tiktok_uploader.upload import TikTokUploader
+
+videos = [
+    {'path': 'video1.mp4', 'description': 'first video', 'schedule': datetime.datetime(2026, 3, 25, 10, 0)},
+    {'path': 'video2.mp4', 'description': 'second video', 'schedule': datetime.datetime(2026, 3, 26, 10, 0)},
+    {'path': 'video3.mp4', 'description': 'third video', 'schedule': datetime.datetime(2026, 3, 27, 10, 0)},
+]
+
+uploader = TikTokUploader(cookies='cookies.txt')
+uploader.upload_videos(videos=videos)
 ```
 
 <h2 id="covers"> 🖼️ Covers</h2>
@@ -213,9 +272,38 @@ Provide `sound_name` to search and select a matching track. Optionally provide `
 - If `sound_artist` is provided, also checks that the artist name contains the given string
 - If no match is found, falls back to the first result with a warning
 
-> **Important:** Use the exact song title and artist name as they appear in TikTok's Sounds panel to ensure a correct match.
+> **Important:** Use the exact song title and artist name as they appear in TikTok's Sounds panel. The spelling must be exact (case-insensitive), otherwise the uploader falls back to the first search result.
 
 > **Limitation:** TikTok only loads approximately 10–20 results per search. If your target song ranks outside this initial batch, it will not appear in the list and the uploader will fall back to the first result. For best results, use well-known tracks or include the artist name to help TikTok surface the correct song.
+
+> **Batch upload note:** Passing `--sound-name` once applies the same song to all videos. To assign different music to each video, repeat `--sound-name` (and optionally `--sound-artist`) once per video in order. If the count does not match `-v`, extra videos will have no music added.
+
+**CLI:**
+
+```bash
+tiktok-uploader -v video.mp4 -d "my description" -c cookies.txt --sound-name "Min plan" --sound-artist "Jacub"
+```
+
+**Batch — same song for all videos:**
+
+```powershell
+uv run tiktok-uploader-batch `
+  -v video1.mp4 -v video2.mp4 -v video3.mp4 `
+  --sound-name "Min plan" --sound-artist "Jacub" `
+  -c cookies.txt --attach
+```
+
+**Batch — different song per video:**
+
+```powershell
+uv run tiktok-uploader-batch `
+  -v video1.mp4 -v video2.mp4 -v video3.mp4 `
+  --sound-name "Song A" --sound-name "Song B" --sound-name "Song C" `
+  --sound-artist "Artist A" --sound-artist "Artist B" --sound-artist "Artist C" `
+  -c cookies.txt --attach
+```
+
+**Python API:**
 
 ```python
 from tiktok_uploader.upload import TikTokUploader
