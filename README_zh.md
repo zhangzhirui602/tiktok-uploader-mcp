@@ -188,7 +188,7 @@ uv run tiktok-uploader -v video.mp4 -d "视频描述" -c cookies.txt -t "2026-03
 
 **批量视频定时发布（CLI）：**
 
-```bash
+```powershell
 # Windows PowerShell（用反引号 ` 换行）
 uv run tiktok-uploader-batch `
   -v video1.mp4 `
@@ -199,18 +199,43 @@ uv run tiktok-uploader-batch `
   -d "第三个视频描述" `
   --schedule-from "2026-03-25 10:00" `
   --schedule-interval 1440 `
-  --timezone "Asia/Shanghai" `
+  --timezone "Europe/Stockholm" `
   -c cookies.txt `
   --attach
+```
+
+**批量视频 + 定时发布 + 背景音乐（每个视频不同音乐）：**
+
+```powershell
+uv run tiktok-uploader-batch `
+  -v video1.mp4 -v video2.mp4 -v video3.mp4 `
+  -d "描述1" -d "描述2" -d "描述3" `
+  --sound-name "歌曲A" --sound-name "歌曲B" --sound-name "歌曲C" `
+  --sound-artist "歌手A" --sound-artist "歌手B" --sound-artist "歌手C" `
+  --schedule-from "2026-03-25 10:00" --schedule-interval 1440 `
+  --timezone "Europe/Stockholm" -c cookies.txt --attach
+```
+
+**所有视频使用同一首音乐（只传一次）：**
+
+```powershell
+uv run tiktok-uploader-batch `
+  -v video1.mp4 -v video2.mp4 -v video3.mp4 `
+  -d "描述1" -d "描述2" -d "描述3" `
+  --sound-name "Min plan" --sound-artist "Jacub" `
+  --schedule-from "2026-03-25 10:00" --schedule-interval 1440 `
+  --timezone "Europe/Stockholm" -c cookies.txt --attach
 ```
 
 | 参数 | 说明 | 默认值 |
 |---|---|---|
 | `-v` | 视频文件路径，每个视频重复一次 | 必填 |
 | `-d` | 视频描述，顺序对应 `-v` | 可选 |
+| `--sound-name` | 背景音乐歌名，重复传入对应每个视频，传一次则所有视频共用 | 可选 |
+| `--sound-artist` | 背景音乐歌手，同上 | 可选 |
 | `--schedule-from` | 第一个视频的发布时间（`YYYY-MM-DD HH:MM`）| 不填则立即发布 |
 | `--schedule-interval` | 每个视频之间的间隔分钟数 | `1440`（24小时）|
-| `--timezone` | `--schedule-from` 所用时区 | `Europe/Copenhagen` |
+| `--timezone` | `--schedule-from` 所用时区，格式如 `Europe/Stockholm`、`Asia/Shanghai` | `Europe/Copenhagen` |
 | `-c` | cookies 文件路径 | 可选 |
 | `--attach` | 显示浏览器窗口（调试用） | 默认无头模式 |
 
@@ -267,6 +292,14 @@ uploader.upload_video(..., cover=my_cover)
 > **重要：** 请使用 TikTok Sounds 面板中显示的**准确歌名和歌手名**，以确保匹配正确。
 
 > **局限性：** TikTok 每次搜索只加载约 10–20 条结果。如果目标歌曲排在这批结果之外，则不会出现在列表中，上传工具会自动 fallback 到第一条。建议使用知名度较高的歌曲，或同时提供歌手名以帮助 TikTok 更准确地返回目标歌曲。
+
+**CLI 单视频：**
+
+```bash
+tiktok-uploader -v video.mp4 -d "描述" -c cookies.txt --sound-name "Min plan" --sound-artist "Jacub"
+```
+
+**Python API：**
 
 ```python
 from tiktok_uploader.upload import TikTokUploader

@@ -282,6 +282,21 @@ def get_batch_args() -> Namespace:
         default="everyone",
         help="Video visibility (default: everyone)",
     )
+    parser.add_argument(
+        "--sound-name",
+        action="append",
+        default=[],
+        metavar="SOUND_NAME",
+        help="Background music name for each video in order (repeat to match -v flags, "
+        "or pass once to apply the same song to all videos)",
+    )
+    parser.add_argument(
+        "--sound-artist",
+        action="append",
+        default=[],
+        metavar="SOUND_ARTIST",
+        help="Background music artist for each video in order (optional)",
+    )
     parser.add_argument("-c", "--cookies", help="Path to cookies file")
     parser.add_argument("-s", "--sessionid", help="TikTok session ID")
     parser.add_argument("-u", "--username", help="TikTok email / username")
@@ -354,6 +369,14 @@ def batch_upload() -> None:
     descriptions: list[str] = args.description or []
     proxy = parse_proxy(args.proxy)
     visibility = args.visibility
+    sound_names: list[str] = args.sound_name or []
+    sound_artists: list[str] = args.sound_artist or []
+
+    # If only one sound is given, apply it to all videos
+    if len(sound_names) == 1:
+        sound_names = sound_names * len(videos)
+    if len(sound_artists) == 1:
+        sound_artists = sound_artists * len(videos)
 
     schedules: list[datetime.datetime | None] = [None] * len(videos)
     if args.schedule_from is not None:
@@ -375,6 +398,10 @@ def batch_upload() -> None:
             vd["schedule"] = schedules[i]
         if visibility != "everyone":
             vd["visibility"] = visibility
+        if i < len(sound_names) and sound_names[i]:
+            vd["sound_name"] = sound_names[i]
+        if i < len(sound_artists) and sound_artists[i]:
+            vd["sound_artist"] = sound_artists[i]
         video_dicts.append(vd)
 
     with TikTokUploader(
