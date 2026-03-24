@@ -6,6 +6,9 @@ test.py
 *.jpeg
 *.png
 .DS_Store
+*_debug.html
+*_debug.png
+.claude/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
