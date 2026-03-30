@@ -19,7 +19,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from tiktok_uploader import config
 from tiktok_uploader.auth import AuthBackend
-from tiktok_uploader.browsers import get_browser
+from tiktok_uploader.browsers import get_browser, get_persistent_browser
 from tiktok_uploader.types import Cookie, ProxyDict, VideoDict
 from tiktok_uploader.utils import bold, green, red
 
@@ -38,6 +38,7 @@ class TikTokUploader:
         proxy: ProxyDict | None = None,
         browser: Literal["chrome", "safari", "chromium", "edge", "firefox"] = "chrome",
         headless: bool = False,
+        profile_dir: str | None = None,
         *args,
         **kwargs,
     ):
@@ -45,15 +46,12 @@ class TikTokUploader:
         Initializes the TikTok Uploader client.
 
         The browser is not started until the first upload is attempted (lazy initialization).
+
+        When *profile_dir* is provided the uploader loads the persistent browser
+        profile stored at that path instead of injecting cookies.  The profile
+        must have been created first with ``tiktok-profile-setup``.
         """
-        self.auth = AuthBackend(
-            username=username,
-            password=password,
-            cookies=cookies,
-            cookies_list=cookies_list,
-            cookies_str=cookies_str,
-            sessionid=sessionid,
-        )
+        self.profile_dir = profile_dir
         self.proxy = proxy
         self.browser_name = browser
         self.headless = headless
@@ -61,9 +59,19 @@ class TikTokUploader:
         self.browser_kwargs = kwargs
 
         self._page: Page | None = None
-        self._browser_context: Any = (
-            None  # Stored implicitly via page.context if needed
-        )
+        self._persistent_context: Any = None
+
+        if not profile_dir:
+            self.auth = AuthBackend(
+                username=username,
+                password=password,
+                cookies=cookies,
+                cookies_list=cookies_list,
+                cookies_str=cookies_str,
+                sessionid=sessionid,
+            )
+        else:
+            self.auth = None  # type: ignore[assignment]
 
     @property
     def page(self) -> Page:
@@ -73,14 +81,29 @@ class TikTokUploader:
                 self.browser_name,
                 "in headless mode" if self.headless else "",
             )
-            self._page = get_browser(
-                self.browser_name,
-                headless=self.headless,
-                proxy=self.proxy,
-                *self.browser_args,
-                **self.browser_kwargs,
-            )  # type: ignore[misc]
-            self._page = self.auth.authenticate_agent(self._page)
+            if self.profile_dir:
+                self._persistent_context, self._page = get_persistent_browser(
+                    profile_dir=self.profile_dir,
+                    name=self.browser_name,
+                    headless=self.headless,
+                    proxy=self.proxy,
+                )
+                self._page.goto(str(config.paths.main))
+                cookies = self._persistent_context.cookies()
+                if not any(c["name"] == "sessionid" for c in cookies):
+                    raise RuntimeError(
+                        f"Profile at '{self.profile_dir}' is not logged in. "
+                        "Run 'tiktok-profile-setup' first."
+                    )
+            else:
+                self._page = get_browser(
+                    self.browser_name,
+                    headless=self.headless,
+                    proxy=self.proxy,
+                    *self.browser_args,
+                    **self.browser_kwargs,
+                )  # type: ignore[misc]
+                self._page = self.auth.authenticate_agent(self._page)
         return self._page
 
     def upload_video(
@@ -236,7 +259,14 @@ class TikTokUploader:
 
     def close(self):
         """Closes the browser instance."""
-        if self._page:
+        if self._persistent_context:
+            try:
+                self._persistent_context.close()
+            except Exception as e:
+                logger.debug(f"Error closing persistent context: {e}")
+            self._persistent_context = None
+            self._page = None
+        elif self._page:
             try:
                 self._page.context.browser.close()
             except Exception as e:
@@ -869,7 +899,11 @@ def __date_picker(page: Page, month: int, day: int) -> None:
             page.screenshot(path="datepicker_debug.png")
             with open("datepicker_debug.html", "w", encoding="utf-8") as f:
                 f.write(page.content())
-            logger.error(red("Date picker not found. Saved datepicker_debug.png and datepicker_debug.html"))
+            logger.error(
+                red(
+                    "Date picker not found. Saved datepicker_debug.png and datepicker_debug.html"
+                )
+            )
         except Exception:
             pass
         raise Exception(f"Date picker not found. Tried: {_DATE_PICKER_SELECTORS}")

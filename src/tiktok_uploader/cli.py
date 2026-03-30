@@ -8,7 +8,12 @@ from os.path import exists, join
 
 import pytz
 
-from tiktok_uploader.auth import login_accounts, save_cookies
+from tiktok_uploader.auth import (
+    login_accounts,
+    save_cookies,
+    setup_profile,
+    setup_profile_from_cookies,
+)
 from tiktok_uploader.types import ProxyDict
 from tiktok_uploader.upload import TikTokUploader
 
@@ -36,6 +41,7 @@ def main() -> None:
         proxy=proxy,
         sessionid=args.sessionid,
         headless=not args.attach,
+        profile_dir=args.profile,
     ) as uploader:
         result = uploader.upload_video(
             filename=args.video,
@@ -109,6 +115,12 @@ def get_uploader_args() -> Namespace:
     parser.add_argument("-u", "--username", help="Your TikTok email / username")
     parser.add_argument("-p", "--password", help="Your TikTok password")
 
+    parser.add_argument(
+        "--profile",
+        help="Path to a persistent browser profile directory (created with tiktok-profile-setup)",
+        default=None,
+    )
+
     # playwright arguments
     parser.add_argument(
         "--attach",
@@ -137,6 +149,14 @@ def validate_uploader_args(args: Namespace) -> None:
     # User can not pass in both cookies and username / password
     if args.cookies and (args.username or args.password):
         raise ValueError("You can not pass in both cookies and username / password")
+
+    # Profile mode is mutually exclusive with other auth options
+    if getattr(args, "profile", None) and (
+        args.cookies or args.sessionid or args.username or args.password
+    ):
+        raise ValueError(
+            "--profile cannot be used together with other authentication options"
+        )
 
 
 def auth() -> None:
@@ -302,6 +322,11 @@ def get_batch_args() -> Namespace:
     parser.add_argument("-u", "--username", help="TikTok email / username")
     parser.add_argument("-p", "--password", help="TikTok password")
     parser.add_argument(
+        "--profile",
+        help="Path to a persistent browser profile directory (created with tiktok-profile-setup)",
+        default=None,
+    )
+    parser.add_argument(
         "--attach",
         "-a",
         action="store_true",
@@ -322,6 +347,13 @@ def validate_batch_args(args: Namespace) -> None:
 
     if args.cookies and (args.username or args.password):
         raise ValueError("You cannot pass both cookies and username/password")
+
+    if getattr(args, "profile", None) and (
+        args.cookies or args.sessionid or args.username or args.password
+    ):
+        raise ValueError(
+            "--profile cannot be used together with other authentication options"
+        )
 
     if args.schedule_from is not None:
         schedule_from_naive = parse_schedule(args.schedule_from)
@@ -411,6 +443,7 @@ def batch_upload() -> None:
         proxy=proxy,
         sessionid=args.sessionid,
         headless=not args.attach,
+        profile_dir=args.profile,
     ) as uploader:
         failed = uploader.upload_videos(video_dicts)
 
@@ -423,6 +456,111 @@ def batch_upload() -> None:
         for v in failed:
             print(f"  - {v.get('path', 'unknown')}")
     print("-------------------------")
+
+
+def profile_setup() -> None:
+    """
+    Entry point for ``tiktok-profile-setup``.
+
+    Opens a visible browser pointed at the given profile directory and waits
+    for the user to manually log in.  Once login is detected the profile is
+    saved so future uploads can use ``--profile`` instead of cookies.
+
+    Usage::
+
+        tiktok-profile-setup --profile profiles/account_001
+        tiktok-profile-setup --profile profiles/account_001 --browser chrome
+        tiktok-profile-setup --profile profiles/account_001 --timeout 600
+    """
+    parser = ArgumentParser(
+        description="Set up a persistent browser profile by logging in once manually"
+    )
+    parser.add_argument(
+        "--profile",
+        required=True,
+        help="Directory to store the persistent browser profile",
+    )
+    parser.add_argument(
+        "--browser",
+        default="chrome",
+        choices=["chrome", "chromium", "firefox", "edge", "safari", "webkit"],
+        help="Browser to use (default: chrome)",
+    )
+    parser.add_argument(
+        "--proxy",
+        help="Proxy in user:pass@host:port or host:port format",
+        default=None,
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Seconds to wait for login before giving up (default: 300)",
+    )
+    args = parser.parse_args()
+
+    proxy = parse_proxy(args.proxy)
+    setup_profile(
+        profile_dir=args.profile,
+        browser=args.browser,  # type: ignore[arg-type]
+        proxy=proxy if proxy else None,
+        timeout=args.timeout,
+    )
+    print(f"Profile saved to: {args.profile}")
+    print("You can now use --profile with tiktok-uploader or tiktok-uploader-batch.")
+
+
+def profile_from_cookies() -> None:
+    """
+    Entry point for ``tiktok-profile-from-cookies``.
+
+    Bootstraps a persistent browser profile from an existing cookies file.
+    Use this when TikTok's anti-bot detection prevents manual login inside the
+    automated browser.
+
+    Usage::
+
+        tiktok-profile-from-cookies --profile profiles/account_001 --cookies cookies.txt
+    """
+    parser = ArgumentParser(
+        description="Create a persistent browser profile from an existing cookies file"
+    )
+    parser.add_argument(
+        "--profile",
+        required=True,
+        help="Directory to store the persistent browser profile",
+    )
+    parser.add_argument(
+        "--cookies",
+        "-c",
+        required=True,
+        help="Path to a Netscape-format cookies file (e.g. cookies.txt)",
+    )
+    parser.add_argument(
+        "--browser",
+        default="chrome",
+        choices=["chrome", "chromium", "firefox", "edge", "safari", "webkit"],
+        help="Browser to use (default: chrome)",
+    )
+    parser.add_argument(
+        "--proxy",
+        help="Proxy in user:pass@host:port or host:port format",
+        default=None,
+    )
+    args = parser.parse_args()
+
+    if not exists(args.cookies):
+        raise FileNotFoundError(f"Cookies file not found: {args.cookies}")
+
+    proxy = parse_proxy(args.proxy)
+    setup_profile_from_cookies(
+        profile_dir=args.profile,
+        cookies_path=args.cookies,
+        browser=args.browser,  # type: ignore[arg-type]
+        proxy=proxy if proxy else None,
+    )
+    print(f"Profile saved to: {args.profile}")
+    print("You can now use --profile with tiktok-uploader or tiktok-uploader-batch.")
 
 
 def parse_proxy(proxy_raw: str | None) -> ProxyDict:

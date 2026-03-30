@@ -7,8 +7,8 @@ from typing import Any, cast
 from playwright.sync_api import Page, expect
 
 from tiktok_uploader import config, logger
-from tiktok_uploader.browsers import get_browser
-from tiktok_uploader.types import Cookie, cookie_from_dict
+from tiktok_uploader.browsers import browser_t, get_browser, get_persistent_browser
+from tiktok_uploader.types import Cookie, ProxyDict, cookie_from_dict
 from tiktok_uploader.utils import green
 
 
@@ -326,6 +326,146 @@ def save_cookies(path: str, cookies: list[Cookie]) -> None:
         cookie_jar.set_cookie(cookie_from_dict(cookie))
 
     cookie_jar.save()
+
+
+def setup_profile(
+    profile_dir: str,
+    browser: browser_t = "chrome",
+    proxy: ProxyDict | None = None,
+    timeout: int = 300,
+) -> None:
+    """
+    Opens a visible browser with the given persistent profile directory and
+    waits for the user to manually log in to TikTok.
+
+    Once a ``sessionid`` cookie is detected the browser is closed and the
+    profile is saved to *profile_dir* automatically by Playwright.
+
+    Parameters
+    ----------
+    profile_dir:
+        Path to the directory where the browser profile will be stored.
+        The directory is created if it does not exist.
+    browser:
+        Browser to use (default: ``"chrome"``).
+    proxy:
+        Optional proxy settings.
+    timeout:
+        How many seconds to wait for the user to log in (default: 300 = 5 min).
+    """
+    import os
+
+    os.makedirs(profile_dir, exist_ok=True)
+
+    logger.info("Opening browser — please log in to TikTok within %d seconds.", timeout)
+
+    context, page = get_persistent_browser(
+        profile_dir=profile_dir,
+        name=browser,
+        headless=False,
+        proxy=proxy,
+    )
+
+    try:
+        page.goto("https://www.tiktok.com/login")
+
+        _LOGIN_SESSION_COOKIES = {"sessionid", "sessionid_ss", "sid_tt"}
+
+        start = time()
+        while True:
+            cookies = context.cookies()
+            cookie_names = {c["name"] for c in cookies}
+            if cookie_names & _LOGIN_SESSION_COOKIES:
+                logger.info(green("Login detected — saving profile to %s"), profile_dir)
+                break
+            # Also detect login by URL leaving the login pages
+            if "tiktok.com/login" not in page.url and "tiktok.com" in page.url:
+                logger.info(
+                    green("Login detected via redirect — saving profile to %s"),
+                    profile_dir,
+                )
+                break
+            if time() - start > timeout:
+                logger.error(
+                    "Timed out. Current URL: %s | Cookies present: %s",
+                    page.url,
+                    cookie_names,
+                )
+                raise TimeoutError(
+                    f"Login not completed within {timeout} seconds. "
+                    "Please re-run the setup command and log in faster."
+                )
+            sleep(1)
+    finally:
+        context.close()
+
+
+def setup_profile_from_cookies(
+    profile_dir: str,
+    cookies_path: str,
+    browser: browser_t = "chrome",
+    proxy: ProxyDict | None = None,
+) -> None:
+    """
+    Initialises a persistent browser profile from an existing cookies file.
+
+    This is the recommended first-time setup when manual login is blocked by
+    TikTok's anti-bot detection.  The cookies are injected into the profile
+    once; afterwards uploads can use ``--profile`` instead of ``--cookies``.
+
+    Parameters
+    ----------
+    profile_dir:
+        Directory where the persistent profile will be stored.
+    cookies_path:
+        Path to a Netscape-format cookies file (e.g. ``cookies.txt``).
+    browser:
+        Browser to use (default: ``"chrome"``).
+    proxy:
+        Optional proxy settings.
+    """
+    import os
+
+    os.makedirs(profile_dir, exist_ok=True)
+
+    auth = AuthBackend(cookies=cookies_path)
+    cookies = auth._resolve_cookies()
+    if not cookies:
+        raise ValueError(f"Could not load any cookies from '{cookies_path}'")
+
+    context, page = get_persistent_browser(
+        profile_dir=profile_dir,
+        name=browser,
+        headless=True,
+        proxy=proxy,
+    )
+
+    try:
+        # Inject cookies into the persistent context
+        playwright_cookies = []
+        for cookie in cookies:
+            c = dict(cookie)
+            if "expiry" in c:
+                c["expires"] = c.pop("expiry")
+            if "sameSite" in c and c["sameSite"] not in ("Strict", "Lax", "None"):
+                c.pop("sameSite")
+            playwright_cookies.append(c)
+
+        context.add_cookies(playwright_cookies)  # type: ignore[arg-type]
+
+        # Navigate to TikTok to let the session activate and persist
+        page.goto(str(config.paths.main))
+
+        final_cookies = {c["name"] for c in context.cookies()}
+        if not (final_cookies & {"sessionid", "sessionid_ss", "sid_tt"}):
+            raise ValueError(
+                "Cookies were injected but no session cookie found. "
+                "Your cookies file may be expired or invalid."
+            )
+
+        logger.info(green("Session verified — profile saved to %s"), profile_dir)
+    finally:
+        context.close()
 
 
 class InsufficientAuth(Exception):

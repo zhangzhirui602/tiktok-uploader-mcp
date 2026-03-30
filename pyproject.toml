@@ -59,6 +59,8 @@ types = [
 tiktok-uploader = "tiktok_uploader.cli:main"
 tiktok-uploader-batch = "tiktok_uploader.cli:batch_upload"
 tiktok-auth = "tiktok_uploader.cli:auth"
+tiktok-profile-setup = "tiktok_uploader.cli:profile_setup"
+tiktok-profile-from-cookies = "tiktok_uploader.cli:profile_from_cookies"
 
 [project.urls]
 "Source Code" = "https://github.com/wkaisertexas/tiktok-uploader"
