@@ -28,6 +28,7 @@
   - [🎵 背景音乐](#sound)
   - [🛍️ 商品链接](#product-link)
   - [🔐 身份认证](#authentication)
+  - [👤 浏览器 Profile 持久化（多账号管理）](#persistent-profile)
   - [👀 浏览器选择](#browser-selection)
   - [🤯 无头浏览器](#headless)
   - [🔨 初始配置](#initial-setup)
@@ -387,6 +388,8 @@ uploader.upload_videos(videos=videos)
 
 身份认证通过浏览器 cookies 实现。这是由于 TikTok 对 Playwright 控制的浏览器登录有更严格的限制而采用的变通方案。
 
+> **管理多个账号或担心 cookies 过期？** 请参阅 [👤 浏览器 Profile 持久化](#persistent-profile)，只需用 cookies 初始化一次，之后无需再维护 cookies 文件。
+
 认证只需要你的 `sessionid`，可以作为参数传入几乎所有函数。
 
 [🍪 Get cookies.txt](https://github.com/kairi003/Get-cookies.txt-LOCALLY) 插件可以帮助你以 [NetScape cookies 格式](http://fileformats.archiveteam.org/wiki/Netscape_cookies.txt) 导出 cookies。
@@ -430,6 +433,78 @@ cookies_list = [
 uploader = TikTokUploader(cookies_list=cookies_list)
 uploader.upload_video(...)
 ```
+
+<h2 id="persistent-profile"> 👤 浏览器 Profile 持久化（多账号管理）</h2>
+
+与每次运行都注入 cookies 不同，你可以将完整的浏览器状态保存在本地文件夹中。TikTok 会将其识别为同一台设备，session 更稳定、更持久，也不再需要定期更新 cookies 文件。
+
+**第一步：用现有 cookies 初始化 Profile（每个账号只需一次）**
+
+```bash
+uv run tiktok-profile-from-cookies --profile profiles/账号名 --cookies cookies.txt
+```
+
+看到 `Session verified — profile saved` 即表示成功。之后 `cookies.txt` 可以不再使用。
+
+**第二步：使用 Profile 上传视频（不再需要 cookies 文件）**
+
+单个视频：
+
+```bash
+uv run tiktok-uploader -v video.mp4 -d "视频描述" --profile profiles/账号名
+```
+
+批量上传：
+
+```powershell
+uv run tiktok-uploader-batch `
+  -v video1.mp4 -v video2.mp4 -v video3.mp4 `
+  -d "描述1" -d "描述2" -d "描述3" `
+  --profile profiles/账号名
+```
+
+定时批量发布：
+
+```powershell
+uv run tiktok-uploader-batch `
+  -v video1.mp4 -v video2.mp4 `
+  -d "描述1" -d "描述2" `
+  --schedule-from "2026-04-01 10:00" `
+  --schedule-interval 1440 `
+  --timezone "Asia/Shanghai" `
+  --profile profiles/账号名
+```
+
+**100 个账号批量初始化示例：**
+
+```bash
+uv run tiktok-profile-from-cookies --profile profiles/account_001 --cookies account_001_cookies.txt
+uv run tiktok-profile-from-cookies --profile profiles/account_002 --cookies account_002_cookies.txt
+# ...依次初始化，之后所有账号均可使用 --profile 上传
+```
+
+**Profile 失效了怎么办？**
+
+重新导出一次 cookies，再跑一次初始化命令即可，Profile 文件夹里的其他浏览器历史状态会保留：
+
+```bash
+uv run tiktok-profile-from-cookies --profile profiles/账号名 --cookies 新cookies.txt
+```
+
+**Python API：**
+
+```python
+from tiktok_uploader.upload import TikTokUploader
+
+uploader = TikTokUploader(profile_dir='profiles/账号名')
+uploader.upload_video('video.mp4', description='视频描述')
+```
+
+> **注意：** `--profile` 与 `--cookies`、`--sessionid`、`--username`/`--password` 互斥，不能同时使用。
+
+> **磁盘空间：** 每个 Profile 文件夹约占 10–50 MB。请定期备份 `profiles/` 文件夹，丢失后需重新初始化。
+
+> **并发限制：** 同一个 Profile 文件夹不能同时被两个浏览器进程打开。并发上传时，每个账号使用独立的 Profile 目录即可。
 
 <h2 id="browser-selection"> 👀 浏览器选择</h2>
 
