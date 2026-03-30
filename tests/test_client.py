@@ -82,3 +82,63 @@ def test_tiktok_uploader_reuse_browser(
 
     # Complete upload should be called twice
     assert mock_complete_upload.call_count == 2
+
+
+@patch("tiktok_uploader.upload.get_persistent_browser")
+def test_profile_session_expired_login_redirect(mock_get_persistent) -> None:
+    """
+    Tests that a RuntimeError is raised when the profile session has expired
+    and TikTok redirects to the login page.
+    """
+    mock_context = MagicMock()
+    mock_page = MagicMock()
+    mock_get_persistent.return_value = (mock_context, mock_page)
+
+    mock_context.cookies.return_value = [{"name": "sessionid", "value": "abc"}]
+    mock_page.url = "https://www.tiktok.com/login/phone-or-email/phone"
+
+    uploader = TikTokUploader(profile_dir="profiles/test_account")
+
+    import pytest
+    with pytest.raises(RuntimeError, match="session has expired"):
+        _ = uploader.page
+
+
+@patch("tiktok_uploader.upload.get_persistent_browser")
+def test_profile_session_expired_explore_redirect(mock_get_persistent) -> None:
+    """
+    Tests that a RuntimeError is raised when TikTok redirects to the explore page
+    (another sign of session expiry).
+    """
+    mock_context = MagicMock()
+    mock_page = MagicMock()
+    mock_get_persistent.return_value = (mock_context, mock_page)
+
+    mock_context.cookies.return_value = [{"name": "sessionid", "value": "abc"}]
+    mock_page.url = "https://www.tiktok.com/explore"
+
+    uploader = TikTokUploader(profile_dir="profiles/test_account")
+
+    import pytest
+    with pytest.raises(RuntimeError, match="session has expired"):
+        _ = uploader.page
+
+
+@patch("tiktok_uploader.upload.get_persistent_browser")
+def test_profile_no_sessionid_cookie(mock_get_persistent) -> None:
+    """
+    Tests that a RuntimeError is raised when the profile has no sessionid cookie at all
+    (profile was never logged in).
+    """
+    mock_context = MagicMock()
+    mock_page = MagicMock()
+    mock_get_persistent.return_value = (mock_context, mock_page)
+
+    mock_context.cookies.return_value = []
+    mock_page.url = "https://www.tiktok.com/"
+
+    uploader = TikTokUploader(profile_dir="profiles/test_account")
+
+    import pytest
+    with pytest.raises(RuntimeError, match="not logged in"):
+        _ = uploader.page

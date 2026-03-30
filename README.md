@@ -481,6 +481,13 @@ tiktok-uploader -v video.mp4 --profile profiles/account_002
 
 > **Note:** `--profile` is mutually exclusive with `--cookies`, `--sessionid`, and `--username`/`--password`.
 
+> **Session expiry detection:** On each run the uploader navigates to TikTok and checks whether the session is still valid. If TikTok redirects to the login or explore page the run fails immediately with a clear error:
+> ```
+> RuntimeError: Profile at 'profiles/account_001' session has expired (redirected to https://www.tiktok.com/login/...).
+> Run 'tiktok-profile-setup' to log in again.
+> ```
+> When you see this, re-run `tiktok-profile-from-cookies` (or `tiktok-profile-setup`) for the affected profile.
+
 > **Disk space:** Each profile directory is approximately 10–50 MB. Back up your `profiles/` folder — if it is lost you will need to re-run `tiktok-profile-from-cookies`.
 
 > **Concurrency:** The same profile directory cannot be opened by two browser instances simultaneously. For parallel uploads, use a separate profile per account.

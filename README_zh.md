@@ -483,9 +483,20 @@ uv run tiktok-profile-from-cookies --profile profiles/account_002 --cookies acco
 # ...依次初始化，之后所有账号均可使用 --profile 上传
 ```
 
+**如何感知 Profile 失效？**
+
+每次运行时，程序会自动导航到 TikTok 并检测 session 是否仍然有效。若被重定向到登录页或 explore 页，会立即报错并停止：
+
+```
+RuntimeError: Profile at 'profiles/账号名' session has expired (redirected to https://www.tiktok.com/login/...).
+Run 'tiktok-profile-setup' to log in again.
+```
+
+看到此错误，说明该账号的 Profile 需要重新初始化。
+
 **Profile 失效了怎么办？**
 
-重新导出一次 cookies，再跑一次初始化命令即可，Profile 文件夹里的其他浏览器历史状态会保留：
+重新导出一次 cookies，再跑一次初始化命令即可：
 
 ```bash
 uv run tiktok-profile-from-cookies --profile profiles/账号名 --cookies 新cookies.txt

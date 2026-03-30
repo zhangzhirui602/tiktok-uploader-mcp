@@ -9,6 +9,7 @@ test.py
 *_debug.html
 *_debug.png
 .claude/
+profiles/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

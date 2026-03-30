@@ -95,6 +95,13 @@ class TikTokUploader:
                         f"Profile at '{self.profile_dir}' is not logged in. "
                         "Run 'tiktok-profile-setup' first."
                     )
+                current_url = self._page.url
+                if "login" in current_url or "explore" in current_url:
+                    raise RuntimeError(
+                        f"Profile at '{self.profile_dir}' session has expired "
+                        f"(redirected to {current_url}). "
+                        "Run 'tiktok-profile-setup' to log in again."
+                    )
             else:
                 self._page = get_browser(
                     self.browser_name,
