@@ -27,6 +27,7 @@
   - [🎵 Sound / Music](#sound)
   - [🛍️ Product Link](#product-link)
   - [🔐 Authentication](#authentication)
+  - [👤 Persistent Browser Profile](#persistent-profile)
   - [👀 Browser Selection](#browser-selection)
   - [🤯 Headless Browsers](#headless)
   - [🔨 Initial Setup](#initial-setup)
@@ -387,6 +388,8 @@ uploader.upload_videos(videos=videos)
 
 Authentication uses your browser's cookies. This workaround was done due to TikTok's stricter stance on authentication by a Playwright-controlled browser.
 
+> **Managing multiple accounts or avoiding cookie expiry?** See [👤 Persistent Browser Profile](#persistent-profile) to bootstrap a long-lived browser profile from your cookies file — no cookie refresh needed afterwards.
+
 Your `sessionid` is all that is required for authentication and can be passed as an argument to nearly any function
 
 [🍪 Get cookies.txt](https://github.com/kairi003/Get-cookies.txt-LOCALLY) makes getting cookies in a [NetScape cookies format](http://fileformats.archiveteam.org/wiki/Netscape_cookies.txt).
@@ -430,6 +433,57 @@ cookies_list = [
 uploader = TikTokUploader(cookies_list=cookies_list)
 uploader.upload_video(...)
 ```
+
+<h2 id="persistent-profile"> 👤 Persistent Browser Profile</h2>
+
+Instead of injecting cookies on every run, you can store a full browser profile on disk. TikTok then sees a consistent device identity across sessions, which keeps the session alive longer and removes the need to refresh cookies.
+
+**Step 1 — Bootstrap the profile once from your existing cookies file:**
+
+```bash
+tiktok-profile-from-cookies --profile profiles/account_001 --cookies cookies.txt
+```
+
+This injects the cookies into a fresh Playwright profile, navigates to TikTok to activate the session, and saves everything to `profiles/account_001/`. You only need to do this once per account.
+
+**Step 2 — Upload using the profile (no cookies file needed):**
+
+```bash
+tiktok-uploader -v video.mp4 -d "my description" --profile profiles/account_001
+```
+
+```bash
+# Batch upload
+tiktok-uploader-batch -v video1.mp4 -v video2.mp4 --profile profiles/account_001
+```
+
+**Python API:**
+
+```python
+from tiktok_uploader.upload import TikTokUploader
+
+uploader = TikTokUploader(profile_dir='profiles/account_001')
+uploader.upload_video('video.mp4', description='my description')
+```
+
+**Multi-account setup (100 accounts example):**
+
+```bash
+# Bootstrap each account once
+tiktok-profile-from-cookies --profile profiles/account_001 --cookies account_001_cookies.txt
+tiktok-profile-from-cookies --profile profiles/account_002 --cookies account_002_cookies.txt
+# ...
+
+# Then upload per account without any cookies file
+tiktok-uploader -v video.mp4 --profile profiles/account_001
+tiktok-uploader -v video.mp4 --profile profiles/account_002
+```
+
+> **Note:** `--profile` is mutually exclusive with `--cookies`, `--sessionid`, and `--username`/`--password`.
+
+> **Disk space:** Each profile directory is approximately 10–50 MB. Back up your `profiles/` folder — if it is lost you will need to re-run `tiktok-profile-from-cookies`.
+
+> **Concurrency:** The same profile directory cannot be opened by two browser instances simultaneously. For parallel uploads, use a separate profile per account.
 
 <h2 id="browser-selection"> 👀 Browser Selection</h2>
 
